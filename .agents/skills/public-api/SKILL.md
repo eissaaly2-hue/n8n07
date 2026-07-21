@@ -51,20 +51,26 @@ Reference: `v1/controllers/tags.public.controller.ts` (`GET /tags`).
      registry passes `req.params` to `userHasScopes`, which does not remap `id`.
    - `@ApiKeyScope` — string, or `{ anyOf }` / `{ allOf }` (no bare arrays).
    - `@ApiResponse(Dto)` — registry `.parse()`s the return value (strips
-     undeclared fields). Shape is provisional until API-39 (doc-gen).
+     undeclared fields) and its schema feeds the generated OpenAPI response.
    - Delegate to the same service as the internal REST controller.
 3. **Side-effect import** the controller from
    `packages/cli/src/public-api/v1/controllers/index.ts` (re-exported via
    `public-api/index.ts`) so metadata is registered before
-   `PublicApiControllerRegistry.activate`. Name the file
+   `PublicApiControllerRegistry.activate` and before
+   `openapi-gen/decorator-routes.ts` discovers the route. Name the file
    `*.public.controller.ts` — `public-api-controllers.test.ts` fails CI if a
    controller file is missing from that barrel or lives outside `controllers/`.
-4. **OpenAPI path spec** — still required for docs + `scope-parity.test.ts`
-   (`handlers/<feature>/spec/paths/…`, `$ref` in `openapi.yml`). Set
-   `operationId`, `x-required-scope` matching `@ApiKeyScope`. **Do not** set
-   `x-eov-operation-id` / `x-eov-operation-handler` — those are legacy eov-only;
-   scope-parity and discover read `@ApiKeyScope` from the controller by matching
-   method + path.
+4. **OpenAPI path spec is generated, not hand-written.** `pnpm run build:data`
+   discovers every `@PublicApiController` route via `resolvePublicApiRoutes()`
+   and writes `handlers/<feature>/spec/paths/<handlerName>.generated.yml` from
+   its DTOs/decorators — `x-required-scope` comes from `@ApiKeyScope`, the
+   response schema from `@ApiResponse`. Point `openapi.yml`'s path at it with a
+   `$ref` (at the whole-path level for a brand-new path, or at the single
+   `get:`/`post:` key when the path has other methods still hand-written —
+   see `handlers/tags/spec/paths/tags.yml`, which mixes a generated `get`
+   with a hand-written `post`). `scope-parity.test.ts` and `discover.service.ts`
+   both read decorator metadata directly for these routes — no eov handler
+   stub needed.
 5. **Coverage manifest** — add every new OpenAPI endpoint to
    `packages/nodes-base/nodes/N8n/n8n-api-coverage.json`.
 
@@ -115,5 +121,14 @@ sort order.
 - Legacy eov examples (migration targets, not templates for new endpoints):
   `handlers/insights/`, `handlers/variables/`, `handlers/folders/`,
   `handlers/projects/`, `handlers/data-tables/`, `handlers/workflows/`
+- **Route resolution (shared by registry + doc-gen):**
+  `packages/cli/src/public-api/public-api-route-resolver.ts`
+- **OpenAPI generation:** `v1/openapi-gen/` — `decorator-routes.ts` (discovers
+  `@PublicApiController` routes automatically), `data-tables.path.ts` (manual
+  registration, for the still-eov-routed `/data-tables`), `generate.ts` (ties
+  both together, called from `scripts/build.mjs`'s `build:data` step)
+- Simple GET via eov + service: `handlers/insights/`
+- CRUD via eov + service/controller: `handlers/variables/`, `handlers/folders/`,
+  `handlers/projects/`, `handlers/data-tables/`
 - Multipart: `handlers/n8n-packages/` (see also
   `packages/cli/src/modules/n8n-packages/CLAUDE.md`)
