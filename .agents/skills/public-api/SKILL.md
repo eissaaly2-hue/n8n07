@@ -54,8 +54,7 @@ Reference: `v1/controllers/tags.public.controller.ts` (`GET /tags`).
    - `@ApiResponse(Dto)` — registry `.parse()`s the return value (strips
      undeclared fields) and its schema feeds the generated OpenAPI response.
    - `@ApiDescription('...')` (optional) — feeds the generated operation's
-     `description`. There's no `@ApiSummary` yet; add one the same way if a
-     route needs it.
+     `description`.
    - Delegate to the same service as the internal REST controller.
 3. **Side-effect import** the controller from
    `packages/cli/src/public-api/v1/controllers/index.ts` (re-exported via
@@ -131,8 +130,8 @@ sort order.
   every `@PublicApiController` route automatically and builds its
   `RouteConfig`; `generate.ts` renders and writes the fragments, called from
   `scripts/build.mjs`'s `build:data` step. Only decorator-routed endpoints are
-  generated today — legacy eov endpoints (e.g. `/data-tables`) keep
-  hand-written YAML until migrated to the controller pattern.
+  generated today — legacy eov endpoints keep hand-written YAML until migrated
+	to the controller pattern.
 - Simple GET via eov + service: `handlers/insights/`
 - CRUD via eov + service/controller: `handlers/variables/`, `handlers/folders/`,
   `handlers/projects/`, `handlers/data-tables/`
