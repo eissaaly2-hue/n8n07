@@ -2,7 +2,12 @@ import type { Logger } from '@n8n/backend-common';
 import type { EndpointsConfig, ExecutionsConfig } from '@n8n/config';
 import type { IExecutionResponse, ExecutionRepository, Project } from '@n8n/db';
 import { WorkflowPublishHistoryRepository } from '@n8n/db';
-import type { WorkflowExecute as ActualWorkflowExecute, InstanceSettings } from 'n8n-core';
+import type {
+	WorkflowExecute as ActualWorkflowExecute,
+	BinaryDataConfig,
+	BinaryDataService,
+	InstanceSettings,
+} from 'n8n-core';
 import { ExternalSecretsProxy } from 'n8n-core';
 import { mockInstance } from 'n8n-core/test/utils';
 import {
@@ -39,7 +44,7 @@ import { WorkflowStaticDataService } from '@/workflows/workflow-static-data.serv
 
 import { JobProcessor } from '../job-processor';
 import type { Job } from '../scaling.types';
-import { ENCODED_BUFFER_KEY } from '../webhook-response-relay';
+import { ENCODED_BUFFER_KEY, WebhookResponseRelay } from '../webhook-response-relay';
 
 mockInstance(WorkflowPublishHistoryRepository);
 mockInstance(VariablesService, {
@@ -1998,11 +2003,30 @@ describe('JobProcessor', () => {
 	});
 
 	describe('webhook response relay', () => {
+		const buildRelay = (webhookResponseRelaySizeMax: number, mode: BinaryDataConfig['mode']) => {
+			const binaryDataService = mock<BinaryDataService>();
+			binaryDataService.store.mockImplementation(async (_location, _body, binaryData) => ({
+				...binaryData,
+				id: `${mode}:stored-file-id`,
+			}));
+
+			const relay = new WebhookResponseRelay(
+				logger,
+				binaryDataService,
+				mock<BinaryDataConfig>({ mode }),
+				mock<EndpointsConfig>({ webhookResponseRelaySizeMax }),
+			);
+
+			return { relay, binaryDataService };
+		};
+
 		/** Runs a job and returns the hooks it registered, so `sendResponse` can be invoked. */
 		const processJobAndCaptureHooks = async (
 			webhookResponseRelaySizeMax: number,
 			jobData: Partial<Job['data']> = {},
+			mode: BinaryDataConfig['mode'] = 'filesystem',
 		) => {
+			const { relay, binaryDataService } = buildRelay(webhookResponseRelaySizeMax, mode);
 			const executionPersistence = mock<ExecutionPersistence>();
 			executionPersistence.findSingleExecution.mockResolvedValue(
 				mock<IExecutionResponse>({
@@ -2025,7 +2049,7 @@ describe('JobProcessor', () => {
 				createManualExecutionServiceMock(),
 				executionsConfig,
 				mock(),
-				mock<EndpointsConfig>({ webhookResponseRelaySizeMax }),
+				relay,
 			);
 
 			const job = mock<Job>({
@@ -2040,7 +2064,7 @@ describe('JobProcessor', () => {
 			});
 			await jobProcessor.processJob(job);
 
-			return { hooks: additionalData.hooks!, job };
+			return { hooks: additionalData.hooks!, job, binaryDataService };
 		};
 
 		it('should relay a response within the size limit, encoding a buffer body', async () => {
@@ -2059,7 +2083,27 @@ describe('JobProcessor', () => {
 			);
 		});
 
-		it('should refuse to relay a response over the size limit', async () => {
+		it('should offload a response over the size limit and relay a reference', async () => {
+			const { hooks, job, binaryDataService } = await processJobAndCaptureHooks(1, {}, 'database');
+
+			await hooks.runHook('sendResponse', [
+				{ body: { blob: 'x'.repeat(2 * 1024 * 1024) }, headers: {}, statusCode: 200 },
+			]);
+
+			expect(binaryDataService.store).toHaveBeenCalledTimes(1);
+			expect(job.progress).toHaveBeenCalledWith(
+				expect.objectContaining({
+					kind: 'respond-to-webhook',
+					response: expect.objectContaining({
+						body: expect.objectContaining({
+							binaryData: expect.objectContaining({ id: 'database:stored-file-id' }),
+						}),
+					}),
+				}),
+			);
+		});
+
+		it('should refuse to relay a response over the size limit without a shared store', async () => {
 			const { hooks, job } = await processJobAndCaptureHooks(1);
 			const relayedBefore = (job.progress as Mock).mock.calls.length;
 
@@ -2072,11 +2116,37 @@ describe('JobProcessor', () => {
 			expect((job.progress as Mock).mock.calls).toHaveLength(relayedBefore);
 		});
 
-		it('should refuse to relay an MCP response over the size limit', async () => {
-			const { hooks, job } = await processJobAndCaptureHooks(1, {
-				isMcpExecution: true,
-				mcpSessionId: 'session-1',
-			});
+		it('should offload an MCP response over the size limit and relay a reference', async () => {
+			const { hooks, job, binaryDataService } = await processJobAndCaptureHooks(
+				1,
+				{ isMcpExecution: true, mcpSessionId: 'session-1', mcpType: 'trigger' },
+				'database',
+			);
+
+			await hooks.runHook('sendResponse', [
+				{ body: { blob: 'x'.repeat(2 * 1024 * 1024) }, headers: {}, statusCode: 200 },
+			]);
+
+			expect(binaryDataService.store).toHaveBeenCalledTimes(1);
+			expect(job.progress).toHaveBeenCalledWith(
+				expect.objectContaining({
+					kind: 'mcp-response',
+					sessionId: 'session-1',
+					response: expect.objectContaining({
+						body: expect.objectContaining({
+							binaryData: expect.objectContaining({ id: 'database:stored-file-id' }),
+						}),
+					}),
+				}),
+			);
+		});
+
+		it('should refuse to relay an oversized MCP payload with no body to offload', async () => {
+			const { hooks, job, binaryDataService } = await processJobAndCaptureHooks(
+				1,
+				{ isMcpExecution: true, mcpSessionId: 'session-1' },
+				'database',
+			);
 			const relayedBefore = (job.progress as Mock).mock.calls.length;
 
 			await expect(
@@ -2084,6 +2154,7 @@ describe('JobProcessor', () => {
 			).rejects.toThrow(/too large/);
 
 			expect((job.progress as Mock).mock.calls).toHaveLength(relayedBefore);
+			expect(binaryDataService.store).not.toHaveBeenCalled();
 		});
 	});
 });

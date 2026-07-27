@@ -36,6 +36,8 @@ import type { Readable } from 'stream';
 import { finished } from 'stream/promises';
 import { mock, type MockProxy } from 'vitest-mock-extended';
 
+import { WebhookResponseRelay } from '@/scaling/webhook-response-relay';
+
 import {
 	autoDetectResponseMode,
 	handleFormRedirectionCase,
@@ -220,6 +222,7 @@ describe('setupResponseNodePromise', () => {
 	const workflowStartNode = mock<INode>();
 	const workflow = mock<Workflow>({ id: workflowId });
 	const binaryDataService = mockInstance(BinaryDataService);
+	const webhookResponseRelay = mockInstance(WebhookResponseRelay);
 	const errorReporter = mockInstance(ErrorReporter);
 	const logger = mockInstance(Logger);
 
@@ -288,6 +291,52 @@ describe('setupResponseNodePromise', () => {
 		expect(mockStream.pipe).toHaveBeenCalledWith(res, { end: false });
 		expect(finished).toHaveBeenCalledWith(mockStream);
 		expect(responseCallback).toHaveBeenCalledWith(null, { noWebhookResponse: true });
+	});
+
+	test('should reclaim an offloaded body once it has been streamed', async () => {
+		binaryDataService.getAsStream.mockResolvedValue(mock<Readable>());
+		const response = {
+			body: { binaryData: { id: 'binary-123' } },
+			headers: {},
+			statusCode: 200,
+		} as unknown as IN8nHttpFullResponse;
+
+		setupResponseNodePromise(
+			responsePromise,
+			res,
+			responseCallback,
+			workflowStartNode,
+			executionId,
+			workflow,
+		);
+
+		responsePromise.resolve(response);
+		await new Promise(process.nextTick);
+
+		expect(webhookResponseRelay.deleteOffloadedBody).toHaveBeenCalledWith(response);
+	});
+
+	test('should reclaim an offloaded body even when streaming fails', async () => {
+		binaryDataService.getAsStream.mockRejectedValue(new Error('store is down'));
+
+		setupResponseNodePromise(
+			responsePromise,
+			res,
+			responseCallback,
+			workflowStartNode,
+			executionId,
+			workflow,
+		);
+
+		responsePromise.resolve({
+			body: { binaryData: { id: 'binary-123' } },
+			headers: {},
+			statusCode: 200,
+		} as unknown as IN8nHttpFullResponse);
+		await new Promise(process.nextTick);
+
+		expect(webhookResponseRelay.deleteOffloadedBody).toHaveBeenCalled();
+		expect(responseCallback).toHaveBeenCalledWith(expect.any(Error), {});
 	});
 
 	test('should apply the status code to binary data responses', async () => {
