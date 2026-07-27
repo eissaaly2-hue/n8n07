@@ -1243,7 +1243,8 @@ export type IExecuteFunctions = ExecuteFunctions.GetNodeParameterFn &
 		getRuntimeCredential(alias: string): Promise<IDataObject[string] | undefined>;
 		putExecutionToWait(waitTill: Date): Promise<void>;
 		sendMessageToUI(message: any): void;
-		sendResponse(response: IExecuteResponsePromiseData): void;
+		/** Resolves once the response has been handed over to the caller waiting for it. */
+		sendResponse(response: IExecuteResponsePromiseData): Promise<void>;
 		sendChunk(type: ChunkType, itemIndex: number, content?: IDataObject | string): void;
 		isStreaming(): boolean;
 		/** Returns true if the node is being executed as an AI Agent tool */
