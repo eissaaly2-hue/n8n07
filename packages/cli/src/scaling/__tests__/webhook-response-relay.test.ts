@@ -114,6 +114,16 @@ describe('assertRelayableSize', () => {
 
 			expect(() => assertRelayableSize(fullResponse(body), 2)).not.toThrow();
 		});
+
+		it('accepts a body and headers each within the limit, measuring them separately', () => {
+			const response: IExecuteResponsePromiseData = {
+				body: 'x'.repeat(ONE_MIB),
+				headers: { 'x-data': 'y'.repeat(ONE_MIB) },
+				statusCode: 200,
+			};
+
+			expect(() => assertRelayableSize(response, 2)).not.toThrow();
+		});
 	});
 
 	describe('over the limit', () => {
@@ -131,6 +141,22 @@ describe('assertRelayableSize', () => {
 			expect(() => assertRelayableSize({ toolResult: 'x'.repeat(3 * ONE_MIB) }, 2)).toThrow(
 				UserError,
 			);
+		});
+
+		it('rejects oversized headers', () => {
+			const response: IExecuteResponsePromiseData = {
+				body: null,
+				headers: { 'x-data': 'x'.repeat(3 * ONE_MIB) },
+				statusCode: 200,
+			};
+
+			expect(() => assertRelayableSize(response, 2)).toThrow(UserError);
+		});
+
+		it('rejects an oversized value beside the body of a payload that is not a full response', () => {
+			const payload = { body: 'small', extra: 'x'.repeat(3 * ONE_MIB) };
+
+			expect(() => assertRelayableSize(payload, 2)).toThrow(UserError);
 		});
 
 		it('names the limit and how to raise it', () => {

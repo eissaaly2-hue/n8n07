@@ -18,18 +18,18 @@ export const ENCODED_BUFFER_KEY = '__@N8nEncodedBuffer@__';
  *
  * @throws UserError When the payload exceeds `maxSizeInMiB`.
  *
- * @remarks The size measured is the body's own, not that of the queue message
- * carrying it: the base64 expansion of a Buffer body is not counted, and a JSON
- * body is measured by a lower bound. Both approximations under-report, so a
- * payload is never rejected for a size it does not have.
+ * @remarks The whole payload counts, headers included, the body and the rest
+ * being measured separately, each against the limit. The size measured is not
+ * that of the queue message carrying the payload: the base64 expansion of a
+ * Buffer body is not counted, and JSON content is measured by a lower bound.
+ * All approximations under-report, so a payload is never rejected for a size
+ * it does not have.
  */
 export function assertRelayableSize(
 	payload: IExecuteResponsePromiseData,
 	maxSizeInMiB: number,
 ): void {
-	const body = isFullResponse(payload) ? payload.body : payload;
-
-	if (exceedsSize(body, maxSizeInMiB * 1024 * 1024)) {
+	if (exceedsRelayableSize(payload, maxSizeInMiB * 1024 * 1024)) {
 		throw new UserError(
 			`The response is too large to be sent back from the worker (over ${maxSizeInMiB} MiB)`,
 			{
@@ -38,6 +38,16 @@ export function assertRelayableSize(
 			},
 		);
 	}
+}
+
+/** Whether any part of the payload would serialize to more than `maxBytes`. */
+function exceedsRelayableSize(payload: IExecuteResponsePromiseData, maxBytes: number): boolean {
+	if (!isFullResponse(payload)) {
+		return exceedsSize(payload, maxBytes);
+	}
+
+	const { body, ...rest } = payload;
+	return exceedsSize(body, maxBytes) || jsonSizeExceeds(rest, maxBytes);
 }
 
 /** Whether the body would serialize to more than `maxBytes`. */
