@@ -43,6 +43,7 @@ Reference: `v1/controllers/tags.public.controller.ts` (`GET /tags`).
      @ApiKeyScope('tag:list')
      @ApiSummary('Retrieve all tags')
      @ApiDescription('Retrieve all tags from your instance.')
+     @ApiTags(['Tags'])
      @ApiResponse(TagListPublicDto)
      async getTags(_req, _res, @Query q: ListTagsQueryDto) { /* call service */ }
    }
@@ -51,17 +52,23 @@ Reference: `v1/controllers/tags.public.controller.ts` (`GET /tags`).
    - For `@ProjectScope` on workflow/credential routes, name the path param
      `workflowId` / `credentialId` (or `projectId` / `dataTableId`) — the
      registry passes `req.params` to `userHasScopes`, which does not remap `id`.
-   - **Decorator order** (top to bottom, wherever present — none are required
-     except the route itself): `@ApiKeyScope` (and `@ProjectScope`/`@GlobalScope`
-     directly after it, if the route needs one), `@ApiSummary`,
-     `@ApiDescription`, `@ApiResponse`, then any `@ApiErrorResponse`. Order
-     doesn't affect what's generated — each decorator writes its own field
-     independently — this is purely so every controller reads the same way.
+   - **Decorator order** (top to bottom, wherever present): `@ApiKeyScope` (and
+     `@ProjectScope`/`@GlobalScope` directly after it, if the route needs one),
+     `@ApiSummary`, `@ApiDescription`, `@ApiTags`, `@ApiResponse`, then any
+     `@ApiErrorResponse`. Order doesn't affect what's generated — each decorator
+     writes its own field independently — this is purely so every controller
+     reads the same way.
    - `@ApiKeyScope` — string, or `{ anyOf }` / `{ allOf }` (no bare arrays).
    - `@ApiSummary('...')` (optional) — feeds the generated operation's
      `summary`.
    - `@ApiDescription('...')` (optional) — feeds the generated operation's
      `description`.
+   - `@ApiTags([...])` — **required**. Feeds the generated operation's `tags`.
+     Not inferred from the URL path — a resource segment doesn't reliably match
+     the doc's established tag names (e.g. `/workflows` groups under the
+     singular `Workflow`). Match whatever tag the resource's other, hand-written
+     operations already use — check `openapi.yml`'s top-level `tags:` list and
+     the resource's existing path files before picking a name.
    - `@ApiResponse(Dto)` — registry `.parse()`s the return value (strips
      undeclared fields) and its schema feeds the generated OpenAPI response.
    - `@ApiErrorResponse(status)` (optional, stackable) — declares an additional
