@@ -41,8 +41,9 @@ Reference: `v1/controllers/tags.public.controller.ts` (`GET /tags`).
 
      @Get('/')
      @ApiKeyScope('tag:list')
-     @ApiResponse(TagListPublicDto)
+     @ApiSummary('Retrieve all tags')
      @ApiDescription('Retrieve all tags from your instance.')
+     @ApiResponse(TagListPublicDto)
      async getTags(_req, _res, @Query q: ListTagsQueryDto) { /* call service */ }
    }
    ```
@@ -50,11 +51,24 @@ Reference: `v1/controllers/tags.public.controller.ts` (`GET /tags`).
    - For `@ProjectScope` on workflow/credential routes, name the path param
      `workflowId` / `credentialId` (or `projectId` / `dataTableId`) — the
      registry passes `req.params` to `userHasScopes`, which does not remap `id`.
+   - **Decorator order** (top to bottom, wherever present — none are required
+     except the route itself): `@ApiKeyScope` (and `@ProjectScope`/`@GlobalScope`
+     directly after it, if the route needs one), `@ApiSummary`,
+     `@ApiDescription`, `@ApiResponse`, then any `@ApiErrorResponse`. Order
+     doesn't affect what's generated — each decorator writes its own field
+     independently — this is purely so every controller reads the same way.
    - `@ApiKeyScope` — string, or `{ anyOf }` / `{ allOf }` (no bare arrays).
-   - `@ApiResponse(Dto)` — registry `.parse()`s the return value (strips
-     undeclared fields) and its schema feeds the generated OpenAPI response.
+   - `@ApiSummary('...')` (optional) — feeds the generated operation's
+     `summary`.
    - `@ApiDescription('...')` (optional) — feeds the generated operation's
      `description`.
+   - `@ApiResponse(Dto)` — registry `.parse()`s the return value (strips
+     undeclared fields) and its schema feeds the generated OpenAPI response.
+   - `@ApiErrorResponse(status)` (optional, stackable) — declares an additional
+     non-2xx status the route can return (e.g. a 404 from a lookup that isn't
+     visible in decorator metadata), `$ref`ing the matching shared response
+     file. 401/403/400 are already inferred automatically; anything else needs
+     this.
    - Delegate to the same service as the internal REST controller.
 3. **Side-effect import** the controller from
    `packages/cli/src/public-api/v1/controllers/index.ts` (re-exported via
