@@ -299,6 +299,13 @@ export class McpServer {
 		};
 	}
 
+	/**
+	 * @returns true this instance holds the transport for `sessionId`
+	 */
+	hasSession(sessionId: string): boolean {
+		return this.sessionManager.getTransport(sessionId) !== undefined;
+	}
+
 	handleWorkerResponse(sessionId: string, messageId: string, result: unknown): void {
 		const callId = messageId ? `${sessionId}_${messageId}` : sessionId;
 		const pending = this.pendingResponses[callId];
