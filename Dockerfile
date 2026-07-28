@@ -4,7 +4,7 @@ FROM node:${NODE_VERSION}-bookworm-slim AS builder
 
 WORKDIR /app
 
-# تثبيت pnpm
+# تفعيل pnpm
 RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
 
 # نسخ ملفات المشروع
@@ -13,10 +13,10 @@ COPY packages/ packages/
 COPY scripts/ scripts/
 COPY patches/ patches/
 
-# تثبيت الاعتماديات
+# تثبيت الاعتماديات (لن يحاول pnpm تثبيت Node.js)
 RUN pnpm install --no-frozen-lockfile
 
-# بناء المشروع (تجاهل n8n-nodes-base لتجنب الأخطاء)
+# بناء المشروع (تجاهل n8n-nodes-base)
 RUN pnpm run build --filter=!n8n-nodes-base
 
 EXPOSE 5678
