@@ -19,11 +19,11 @@ export const ENCODED_BUFFER_KEY = '__@N8nEncodedBuffer@__';
  * @throws UserError When the payload exceeds `maxSizeInMiB`.
  *
  * @remarks The whole payload counts, headers included, the body and the rest
- * being measured separately, each against the limit. The size measured is not
- * that of the queue message carrying the payload: the base64 expansion of a
- * Buffer body is not counted, and JSON content is measured by a lower bound.
- * All approximations under-report, so a payload is never rejected for a size
- * it does not have.
+ * being measured separately, each against the limit. The size measured is a
+ * lower bound on that of the queue message carrying the payload: a Buffer body
+ * counts base64-encoded, the form it travels in, but the envelope around it and
+ * the exact serialization of JSON content are not counted. Under-reporting keeps
+ * a payload from ever being rejected for a size it does not have.
  */
 export function assertRelayableSize(
 	payload: IExecuteResponsePromiseData,
@@ -53,7 +53,7 @@ function exceedsRelayableSize(payload: IExecuteResponsePromiseData, maxBytes: nu
 /** Whether the body would serialize to more than `maxBytes`. */
 function exceedsSize(body: IN8nHttpFullResponse['body'], maxBytes: number): boolean {
 	if (Buffer.isBuffer(body)) {
-		return body.length > maxBytes;
+		return base64Size(body.length) > maxBytes;
 	}
 
 	if (typeof body === 'string') {
@@ -65,6 +65,15 @@ function exceedsSize(body: IN8nHttpFullResponse['body'], maxBytes: number): bool
 	}
 
 	return false; // a stream is not relayed, and a binary-data reference carries no payload
+}
+
+/**
+ * Bytes `byteLength` bytes occupy once base64-encoded, the form a Buffer body
+ * takes to travel inline. Excludes the envelope around it, keeping this a lower
+ * bound.
+ */
+function base64Size(byteLength: number): number {
+	return Math.ceil(byteLength / 3) * 4;
 }
 
 function isJsonObject(body: IN8nHttpFullResponse['body']): body is IDataObject {

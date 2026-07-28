@@ -137,6 +137,13 @@ describe('assertRelayableSize', () => {
 			expect(() => assertRelayableSize(fullResponse(body), 2)).toThrow(UserError);
 		});
 
+		it('rejects a Buffer body only its base64 expansion pushes over the limit', () => {
+			// Under the limit raw, a third over it once encoded.
+			const body = Buffer.alloc(1.75 * ONE_MIB);
+
+			expect(() => assertRelayableSize(fullResponse(body), 2)).toThrow(UserError);
+		});
+
 		it('rejects a payload that is not a full response', () => {
 			expect(() => assertRelayableSize({ toolResult: 'x'.repeat(3 * ONE_MIB) }, 2)).toThrow(
 				UserError,
