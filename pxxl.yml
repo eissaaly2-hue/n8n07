@@ -1,0 +1,12 @@
+port: 5678
+entrypoint: pnpm start
+build:
+  command: |
+    corepack enable
+    corepack prepare pnpm@10.22.0 --activate
+    pnpm install --no-frozen-lockfile
+    pnpm run build --filter=!n8n-nodes-base
+environment:
+  NODE_VERSION: 22.22.0
+  PNPM_VERSION: 10.22.0
+  COREPACK_ENABLE_NODE_VERSION_CHECK: "0"
