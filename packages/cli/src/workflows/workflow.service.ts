@@ -18,12 +18,12 @@ import { Container, Service } from '@n8n/di';
 import type { Scope } from '@n8n/permissions';
 import { hasGlobalScope } from '@n8n/permissions';
 import type { EntityManager } from '@n8n/typeorm';
-import { In } from '@n8n/typeorm';
+import { In, QueryFailedError } from '@n8n/typeorm';
 import type { QueryDeepPartialEntity } from '@n8n/typeorm/query-builder/QueryPartialEntity';
+import { ensureError } from '@n8n/utils/errors/ensure-error';
 import isEqual from 'lodash/isEqual';
 import pick from 'lodash/pick';
 import type { INode, INodes, IWorkflowSettings, JsonValue, IConnections } from 'n8n-workflow';
-import { ensureError } from '@n8n/utils/errors/ensure-error';
 import { PROJECT_ROOT, Workflow, assert, calculateWorkflowChecksum } from 'n8n-workflow';
 import { v4 as uuid } from 'uuid';
 
@@ -52,16 +52,15 @@ import { OwnershipService } from '@/services/ownership.service';
 import { ProjectService } from '@/services/project.service.ee';
 import { RoleService } from '@/services/role.service';
 import { TagService } from '@/services/tag.service';
-import { getBase as getWorkflowExecutionData } from '@/workflow-execute-additional-data';
-
-import { WorkflowValidationService } from './workflow-validation.service';
-
 import { WebhookService } from '@/webhooks/webhook.service';
+import { getBase as getWorkflowExecutionData } from '@/workflow-execute-additional-data';
 import * as WorkflowHelpers from '@/workflow-helpers';
+
 import { WorkflowPublicationNotifier } from './publication/workflow-publication-notifier';
 import { getErrorDescription, getErrorNodeId, getRequiredRedactionScopes } from './utils';
 import { WorkflowFinderService } from './workflow-finder.service';
 import { WorkflowHistoryService } from './workflow-history/workflow-history.service';
+import { WorkflowValidationService } from './workflow-validation.service';
 
 @Service()
 export class WorkflowService {
@@ -1536,5 +1535,22 @@ export class WorkflowService {
 		// Wake the leader now that the record is committed, so it drains without
 		// waiting for the next poll cycle.
 		this.workflowPublicationNotifier.requestDrain();
+	}
+
+	/**
+	 * Replace all tag mappings on a workflow. Caller must have already verified
+	 * the user may update the workflow. Missing tag IDs surface as NotFoundError.
+	 */
+	async updateWorkflowTags(workflowId: string, tagIds: string[]) {
+		try {
+			await this.workflowTagMappingRepository.overwriteTaggings(workflowId, tagIds);
+		} catch (error) {
+			if (error instanceof QueryFailedError) {
+				throw new NotFoundError('Some tags not found');
+			}
+			throw error;
+		}
+
+		return await this.tagService.getAllByWorkflowId(workflowId);
 	}
 }
