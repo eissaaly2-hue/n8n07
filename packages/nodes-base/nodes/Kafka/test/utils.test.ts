@@ -1,6 +1,7 @@
 import { SchemaRegistry } from '@kafkajs/confluent-schema-registry';
 import type { IDeferredPromise } from '@n8n/utils/promise/deferred-promise';
 import { createResultError, createResultOk } from '@n8n/utils/result';
+import type { Consumer } from 'kafkajs';
 import type * as _importType0 from 'n8n-workflow';
 import type {
 	ITriggerFunctions,
@@ -11,6 +12,7 @@ import type {
 	NodeEgressFilter,
 } from 'n8n-workflow';
 import { NodeOperationError, OperationalError, sleep } from 'n8n-workflow';
+import { getEventListeners } from 'node:events';
 import http from 'node:http';
 import https from 'node:https';
 import type { LookupFunction } from 'node:net';
@@ -26,6 +28,7 @@ import {
 	getSchemaRegistryOptions,
 	resolveKafkaSsl,
 	setSchemaRegistry,
+	stopAndDisconnectConsumer,
 	withTimeout,
 } from '../utils';
 
@@ -295,7 +298,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({ resolveOffset: 'onCompletion' }, 'manual');
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const result = await emitter(testData);
@@ -308,7 +311,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({}, 'trigger');
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1);
+				const emitter = configureDataEmitter(ctx, options, 1, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const result = await emitter(testData);
@@ -321,7 +324,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({}, 'trigger');
 				const options: KafkaTriggerOptions = { parallelProcessing: true };
 
-				const emitter = configureDataEmitter(ctx, options, 1.1);
+				const emitter = configureDataEmitter(ctx, options, 1.1, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const result = await emitter(testData);
@@ -334,7 +337,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({ resolveOffset: 'immediately' }, 'trigger');
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const result = await emitter(testData);
@@ -354,7 +357,7 @@ describe('Kafka Utils', () => {
 				);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -377,7 +380,7 @@ describe('Kafka Utils', () => {
 				);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -395,7 +398,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({}, 'trigger', deferredPromise);
 				const options: KafkaTriggerOptions = { parallelProcessing: false };
 
-				const emitter = configureDataEmitter(ctx, options, 1.1);
+				const emitter = configureDataEmitter(ctx, options, 1.1, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -415,7 +418,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({ resolveOffset: 'onSuccess' }, 'trigger', deferredPromise);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -432,7 +435,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({ resolveOffset: 'onSuccess' }, 'trigger', deferredPromise);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -451,7 +454,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({ resolveOffset: 'onSuccess' }, 'trigger', deferredPromise);
 				const options: KafkaTriggerOptions = { errorRetryDelay: 10000 };
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -472,7 +475,9 @@ describe('Kafka Utils', () => {
 				);
 				const options: KafkaTriggerOptions = {};
 
-				expect(() => configureDataEmitter(ctx, options, 1.3)).toThrow(NodeOperationError);
+				expect(() => configureDataEmitter(ctx, options, 1.3, new AbortController().signal)).toThrow(
+					NodeOperationError,
+				);
 			});
 
 			it('should return success when execution status matches allowed statuses', async () => {
@@ -484,7 +489,7 @@ describe('Kafka Utils', () => {
 				);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -505,7 +510,7 @@ describe('Kafka Utils', () => {
 				);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -530,7 +535,7 @@ describe('Kafka Utils', () => {
 				ctx.getWorkflowSettings.mockReturnValue({ executionTimeout: 1 }); // 1 second timeout
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -555,7 +560,7 @@ describe('Kafka Utils', () => {
 				ctx.getWorkflowSettings.mockReturnValue({}); // No timeout configured
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -578,7 +583,7 @@ describe('Kafka Utils', () => {
 				ctx.getWorkflowSettings.mockReturnValue({ executionTimeout: 10 });
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -606,7 +611,7 @@ describe('Kafka Utils', () => {
 				);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -629,7 +634,7 @@ describe('Kafka Utils', () => {
 				);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -649,7 +654,7 @@ describe('Kafka Utils', () => {
 				const ctx = createMockContext({}, 'manual');
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test1' } }, { json: { message: 'test2' } }];
 
 				await emitter(testData);
@@ -666,7 +671,7 @@ describe('Kafka Utils', () => {
 				);
 				const options: KafkaTriggerOptions = {};
 
-				const emitter = configureDataEmitter(ctx, options, 1.3);
+				const emitter = configureDataEmitter(ctx, options, 1.3, new AbortController().signal);
 				const testData = [{ json: { message: 'test' } }];
 
 				const resultPromise = emitter(testData);
@@ -697,7 +702,6 @@ describe('Kafka Utils', () => {
 				const result = await resultPromise;
 
 				expect(result).toEqual({ success: false });
-				// Teardown must not be delayed by the error retry backoff
 				expect(mockedSleep).not.toHaveBeenCalled();
 			});
 
@@ -734,14 +738,12 @@ describe('Kafka Utils', () => {
 				const deferredPromise = createDeferredPromise<IRun>();
 				const ctx = createMockContext({ resolveOffset: 'onSuccess' }, 'trigger', deferredPromise);
 				const closeController = new AbortController();
-				// A backoff that never ends on its own: without the abort race the
-				// emitter (and with it consumer.stop()) would block indefinitely
+				// Never-ending backoff: the test hangs here unless abort cuts it short
 				mockedSleep.mockReturnValueOnce(new Promise<void>(() => {}));
 
 				const emitter = configureDataEmitter(ctx, {}, 1.3, closeController.signal);
 				const resultPromise = emitter([{ json: { message: 'test' } }]);
 
-				// A failed execution status sends the emitter into the retry backoff
 				deferredPromise.resolveWith({ status: 'error' } as unknown as IRun);
 				await vi.advanceTimersByTimeAsync(0);
 				expect(mockedSleep).toHaveBeenCalled();
@@ -752,7 +754,7 @@ describe('Kafka Utils', () => {
 				expect(result).toEqual({ success: false });
 			});
 
-			it('should remove the abort listener once the execution completes', async () => {
+			it('should not accumulate abort listeners across messages', async () => {
 				const deferredPromise = createDeferredPromise<IRun>();
 				const ctx = createMockContext(
 					{ resolveOffset: 'onCompletion' },
@@ -760,16 +762,77 @@ describe('Kafka Utils', () => {
 					deferredPromise,
 				);
 				const closeController = new AbortController();
-				const removeListenerSpy = vi.spyOn(closeController.signal, 'removeEventListener');
 
 				const emitter = configureDataEmitter(ctx, {}, 1.3, closeController.signal);
-				const resultPromise = emitter([{ json: { message: 'test' } }]);
-
 				deferredPromise.resolveWith({ status: 'success' } as unknown as IRun);
-				await resultPromise;
 
-				expect(removeListenerSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+				await emitter([{ json: { message: 'one' } }]);
+				await emitter([{ json: { message: 'two' } }]);
+				await emitter([{ json: { message: 'three' } }]);
+
+				expect(getEventListeners(closeController.signal, 'abort')).toHaveLength(1);
 			});
+		});
+	});
+
+	describe('stopAndDisconnectConsumer', () => {
+		const logger = mock<Logger>();
+
+		it('should stop then disconnect and return undefined on success', async () => {
+			const consumer = mock<Consumer>({
+				stop: vi.fn(async () => {}),
+				disconnect: vi.fn(async () => {}),
+			});
+
+			await expect(stopAndDisconnectConsumer(consumer, logger, 1000)).resolves.toBeUndefined();
+
+			expect(consumer.stop).toHaveBeenCalled();
+			expect(consumer.disconnect).toHaveBeenCalled();
+		});
+
+		it('should still disconnect and return the stop error when stop() rejects', async () => {
+			const stopError = new Error('The group is rebalancing, so a rejoin is needed');
+			const consumer = mock<Consumer>({
+				stop: vi.fn(async () => {
+					throw stopError;
+				}),
+				disconnect: vi.fn(async () => {}),
+			});
+
+			await expect(stopAndDisconnectConsumer(consumer, logger, 1000)).resolves.toBe(stopError);
+
+			expect(consumer.disconnect).toHaveBeenCalled();
+		});
+
+		it('should not await disconnect while stop() is pending, then disconnect once it settles', async () => {
+			vi.useFakeTimers();
+			try {
+				let resolveStop!: () => void;
+				const consumer = mock<Consumer>({
+					stop: vi.fn(
+						async () =>
+							await new Promise<void>((resolve) => {
+								resolveStop = resolve;
+							}),
+					),
+					disconnect: vi.fn(async () => {}),
+				});
+
+				const resultPromise = stopAndDisconnectConsumer(consumer, logger, 1000);
+				await vi.advanceTimersByTimeAsync(1000);
+				const error = await resultPromise;
+
+				expect(error).toBeInstanceOf(OperationalError);
+				expect((error as Error).message).toBe('Kafka consumer did not stop in time');
+				// A still-pending stop() means disconnect() would join the same shared promise
+				expect(consumer.disconnect).not.toHaveBeenCalled();
+
+				resolveStop();
+				await vi.advanceTimersByTimeAsync(0);
+				expect(consumer.disconnect).toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 
