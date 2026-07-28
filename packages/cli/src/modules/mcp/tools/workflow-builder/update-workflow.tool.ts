@@ -756,16 +756,16 @@ export const createUpdateWorkflowTool = (
 			let autoAssignOutcomes: SlotOutcome[] = [];
 
 			if (result.addedNodeNames.length > 0) {
-				const addedNodeSet = new Set(result.addedNodeNames);
-				const addedNodes = workflowUpdateData.nodes.filter((n) => addedNodeSet.has(n.name));
-
+				// Pass the full workflow so credentials on pre-existing nodes are reused
+				// for the added nodes, but only populate the added ones.
 				const autoAssign = await autoPopulateNodeCredentials(
-					{ ...workflowUpdateData, nodes: addedNodes },
+					workflowUpdateData,
 					user,
 					nodeTypes,
 					credentialsService,
 					workflowProjectId,
 					aiGatewayService,
+					new Set(result.addedNodeNames),
 				);
 				credentialAssignments = autoAssign.assignments;
 				skippedHttpNodes = autoAssign.skippedHttpNodes;

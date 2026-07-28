@@ -297,6 +297,107 @@ describe('autoPopulateNodeCredentials', () => {
 		expect(node.credentials?.slackApi).toEqual({ id: 'cred-1', name: 'Slack Token A' });
 	});
 
+	test('prefers the credential already used elsewhere in the workflow', async () => {
+		const existingNode = makeNode({
+			id: 'existing',
+			name: 'Existing Slack',
+			credentials: { slackApi: { id: 'cred-2', name: 'Slack Token B' } },
+		});
+		const newNode = makeNode({ id: 'new', name: 'New Slack' });
+		const workflow = makeWorkflow([existingNode, newNode]);
+		const desc = makeNodeTypeDescription();
+		const { credentialsService, nodeTypes } = createMocks({
+			usableCredentials: [
+				{ id: 'cred-1', name: 'Slack Token A', type: 'slackApi' },
+				{ id: 'cred-2', name: 'Slack Token B', type: 'slackApi' },
+			],
+			nodeTypeDescriptions: new Map([['n8n-nodes-base.slack', desc]]),
+		});
+
+		vi.spyOn(NodeHelpers, 'displayParameter').mockReturnValue(true);
+
+		const result = await autoPopulateNodeCredentials(
+			workflow,
+			user,
+			nodeTypes,
+			credentialsService,
+			projectId,
+		);
+
+		expect(result.assignments).toEqual([
+			{
+				nodeName: 'New Slack',
+				credentialName: 'Slack Token B',
+				credentialType: 'slackApi',
+				source: 'user',
+			},
+		]);
+		expect(newNode.credentials).toEqual({ slackApi: { id: 'cred-2', name: 'Slack Token B' } });
+	});
+
+	test('falls back to the first usable credential when the in-use one is not usable', async () => {
+		const existingNode = makeNode({
+			id: 'existing',
+			name: 'Existing Slack',
+			credentials: { slackApi: { id: 'cred-inaccessible', name: 'Someone Elses' } },
+		});
+		const newNode = makeNode({ id: 'new', name: 'New Slack' });
+		const workflow = makeWorkflow([existingNode, newNode]);
+		const desc = makeNodeTypeDescription();
+		const { credentialsService, nodeTypes } = createMocks({
+			usableCredentials: [{ id: 'cred-1', name: 'Slack Token A', type: 'slackApi' }],
+			nodeTypeDescriptions: new Map([['n8n-nodes-base.slack', desc]]),
+		});
+
+		vi.spyOn(NodeHelpers, 'displayParameter').mockReturnValue(true);
+
+		await autoPopulateNodeCredentials(workflow, user, nodeTypes, credentialsService, projectId);
+
+		expect(newNode.credentials).toEqual({ slackApi: { id: 'cred-1', name: 'Slack Token A' } });
+	});
+
+	test('only populates target nodes but reuses credentials from the rest of the workflow', async () => {
+		const existingNode = makeNode({
+			id: 'existing',
+			name: 'Existing Slack',
+			credentials: { slackApi: { id: 'cred-2', name: 'Slack Token B' } },
+		});
+		const untouchedNode = makeNode({ id: 'untouched', name: 'Untouched Slack' });
+		const newNode = makeNode({ id: 'new', name: 'New Slack' });
+		const workflow = makeWorkflow([existingNode, untouchedNode, newNode]);
+		const desc = makeNodeTypeDescription();
+		const { credentialsService, nodeTypes } = createMocks({
+			usableCredentials: [
+				{ id: 'cred-1', name: 'Slack Token A', type: 'slackApi' },
+				{ id: 'cred-2', name: 'Slack Token B', type: 'slackApi' },
+			],
+			nodeTypeDescriptions: new Map([['n8n-nodes-base.slack', desc]]),
+		});
+
+		vi.spyOn(NodeHelpers, 'displayParameter').mockReturnValue(true);
+
+		const result = await autoPopulateNodeCredentials(
+			workflow,
+			user,
+			nodeTypes,
+			credentialsService,
+			projectId,
+			undefined,
+			new Set(['New Slack']),
+		);
+
+		expect(result.assignments).toEqual([
+			{
+				nodeName: 'New Slack',
+				credentialName: 'Slack Token B',
+				credentialType: 'slackApi',
+				source: 'user',
+			},
+		]);
+		expect(newNode.credentials).toEqual({ slackApi: { id: 'cred-2', name: 'Slack Token B' } });
+		expect(untouchedNode.credentials).toBeUndefined();
+	});
+
 	test('handles multiple nodes with different credential types', async () => {
 		const slackNode = makeNode({ id: '1', name: 'Slack', type: 'n8n-nodes-base.slack' });
 		const gmailNode = makeNode({ id: '2', name: 'Gmail', type: 'n8n-nodes-base.gmail' });

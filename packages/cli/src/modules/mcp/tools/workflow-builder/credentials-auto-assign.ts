@@ -133,11 +133,16 @@ function resolveNodeParameters(node: INode, nodeTypes: NodeTypes): INodeParamete
  *
  * Resolution order per slot:
  * 1. Explicit credential id in the node — untouched
- * 2. First usable user credential of the matching type
+ * 2. Usable user credential of the matching type — preferring one already used
+ *    elsewhere in the workflow, so e.g. a second Slack node gets the same
+ *    credential as the existing Slack trigger; otherwise the first usable one
  * 3. AI Gateway ("n8n Connect") sentinel when eligible and `aiGatewayService` is passed
  * 4. Leave empty
  *
  * HTTP Request nodes are skipped for security.
+ *
+ * When `targetNodeNames` is passed, only those nodes are populated; the other
+ * workflow nodes still serve as the reuse reference in step 2.
  *
  * When `aiGatewayService` is omitted, behavior is byte-for-byte pre-change:
  * only steps 1, 2, 4 run, and `outcomes` records
@@ -150,6 +155,7 @@ export async function autoPopulateNodeCredentials(
 	credentialsService: CredentialsService,
 	projectId: string,
 	aiGatewayService?: AiGatewayService,
+	targetNodeNames?: ReadonlySet<string>,
 ): Promise<AutoAssignResult> {
 	const usableCredentials = await credentialsService.getCredentialsAUserCanUseInAWorkflow(user, {
 		projectId,
@@ -162,6 +168,15 @@ export async function autoPopulateNodeCredentials(
 		credentialsByType.set(cred.type, list);
 	}
 
+	// Credentials already referenced by the workflow, by type — reused for empty
+	// slots so new nodes match same-type nodes already present.
+	const inUseByType = new Map<string, string>();
+	for (const node of workflow.nodes) {
+		for (const [type, cred] of Object.entries(node.credentials ?? {})) {
+			if (cred?.id && !inUseByType.has(type)) inUseByType.set(type, cred.id);
+		}
+	}
+
 	const availability = aiGatewayService
 		? await aiGatewayService.isAvailable()
 		: ({ available: false } as const);
@@ -169,13 +184,17 @@ export async function autoPopulateNodeCredentials(
 		? availability.config
 		: undefined;
 
-	reconcileAiGatewayMarkers(workflow.nodes, nodeTypes, aiGatewayConfig);
+	const targetNodes = targetNodeNames
+		? workflow.nodes.filter((node) => targetNodeNames.has(node.name))
+		: workflow.nodes;
+
+	reconcileAiGatewayMarkers(targetNodes, nodeTypes, aiGatewayConfig);
 
 	const assignments: CredentialAssignment[] = [];
 	const skippedHttpNodes: string[] = [];
 	const outcomes: SlotOutcome[] = [];
 
-	for (const node of workflow.nodes) {
+	for (const node of targetNodes) {
 		if (node.disabled) continue;
 
 		if (HTTP_NODE_TYPES.has(node.type)) {
@@ -227,14 +246,16 @@ export async function autoPopulateNodeCredentials(
 			const hadUserCredential = !!userCandidates?.length;
 
 			if (hadUserCredential) {
+				const inUseId = inUseByType.get(credDesc.name);
+				const chosen = userCandidates.find((c) => c.id === inUseId) ?? userCandidates[0];
 				node.credentials = node.credentials ?? {};
 				node.credentials[credDesc.name] = {
-					id: userCandidates[0].id,
-					name: userCandidates[0].name,
+					id: chosen.id,
+					name: chosen.name,
 				};
 				assignments.push({
 					nodeName: node.name,
-					credentialName: userCandidates[0].name,
+					credentialName: chosen.name,
 					credentialType: credDesc.name,
 					source: 'user',
 				});

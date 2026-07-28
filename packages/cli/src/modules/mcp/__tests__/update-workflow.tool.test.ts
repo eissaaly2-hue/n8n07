@@ -1104,10 +1104,11 @@ describe('update-workflow MCP tool', () => {
 			});
 
 			expect(mockAutoPopulateNodeCredentials).toHaveBeenCalledTimes(1);
-			const slimWorkflow = mockAutoPopulateNodeCredentials.mock.calls[0][0] as {
-				nodes: INode[];
-			};
-			expect(slimWorkflow.nodes.map((n) => n.name)).toEqual(['C']);
+			// Full workflow is passed for credential reuse, but only added nodes are targeted.
+			const call = mockAutoPopulateNodeCredentials.mock.calls[0];
+			const fullWorkflow = call[0] as { nodes: INode[] };
+			expect(fullWorkflow.nodes.map((n) => n.name)).toEqual(['A', 'B', 'C']);
+			expect(call[6]).toEqual(new Set(['C']));
 		});
 
 		test('skips credential auto-assign entirely when no nodes are added', async () => {

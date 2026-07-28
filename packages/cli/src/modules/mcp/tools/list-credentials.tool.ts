@@ -118,7 +118,7 @@ export const createListCredentialsTool = (
 	name: 'list_credentials',
 	config: {
 		description:
-			'List credentials the current user can access. Use this to find a credential ID before referencing it from a workflow node. Never returns credential secret data.',
+			'List credentials the current user can access. Use this to find a credential ID before referencing it from a workflow node. If the workflow already contains a node using the same credential type, leave the credential unset instead — the server reuses that credential automatically. If it does not and multiple credentials of the required type exist, ask the user which one to use rather than picking one. Never returns credential secret data.',
 		inputSchema,
 		outputSchema,
 		annotations: {
