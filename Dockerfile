@@ -1,5 +1,6 @@
-# Dockerfile في جذر المشروع
-FROM node:22.22.0-alpine3.20
+# استخدم Debian بدلاً من Alpine لتجنب مشكلة MUSL
+ARG NODE_VERSION=22.22.0
+FROM node:${NODE_VERSION}-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -15,8 +16,8 @@ COPY patches/ patches/
 # تثبيت الاعتماديات
 RUN pnpm install --no-frozen-lockfile
 
-# بناء المشروع
-RUN pnpm run build
+# بناء المشروع (تجاهل n8n-nodes-base لتجنب الأخطاء)
+RUN pnpm run build --filter=!n8n-nodes-base
 
 EXPOSE 5678
 CMD ["pnpm", "start"]
