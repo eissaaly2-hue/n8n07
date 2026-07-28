@@ -60,8 +60,11 @@ Reference: `v1/controllers/tags.public.controller.ts` (`GET /tags`).
    - `@ApiSummary('...')` (optional) — operation's `summary`.
    - `@ApiDescription('...')` (optional) - operation's `description`.
    - `@ApiTags([...])` (optional) — operation's `tags`.
-   - `@ApiResponse(Dto)` — registry `.parse()`s the return value (strips
-     undeclared fields) and its schema feeds the generated OpenAPI response.
+   - `@ApiResponse(Dto)` (optional) — registry `.parse()`s the return value
+     (strips undeclared fields) and its schema feeds the generated OpenAPI
+     response. Omit it for a route with no response body (e.g. one that calls
+     `res.status(204).send()` itself) — the generated `200` just has no
+     `content` key, and the registry leaves an already-sent response alone.
    - `@ApiErrorResponse(status)` (optional, stackable) — declares an additional
      non-2xx status the route can return (e.g. a 404 from a lookup that isn't
      visible in decorator metadata), `$ref`ing the matching shared response
