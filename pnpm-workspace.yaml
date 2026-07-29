@@ -282,7 +282,6 @@ minimumReleaseAgeExclude:
 
 onlyBuiltDependencies:
   - "@vscode/ripgrep"
-  - sqlite3
 
 overrides:
   libphonenumber-js: npm:empty-npm-package@1.0.0
