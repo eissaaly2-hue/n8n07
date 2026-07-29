@@ -1,3 +1,4 @@
+build-from-source = true
 frozen-lockfile = false
 audit = false
 fund = false
