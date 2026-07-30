@@ -1,23 +1,28 @@
-# استخدم Debian بدلاً من Alpine لتجنب مشكلة MUSL
-ARG NODE_VERSION=22.22.0
-FROM node:${NODE_VERSION}-bookworm-slim AS builder
+FROM node:20-alpine
 
-WORKDIR /app
+RUN npm install -g n8n && \
+    apk add --no-cache python3 py3-pip
 
-# تفعيل pnpm
-RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
+RUN mkdir -p /home/node/.n8n && chown -R node:node /home/node/.n8n && chmod -R 755 /home/node/.n8n
 
-# نسخ ملفات المشروع
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-COPY packages/ packages/
-COPY scripts/ scripts/
-COPY patches/ patches/
+USER node
+WORKDIR /home/node/.n8n
 
-# تثبيت الاعتماديات (لن يحاول pnpm تثبيت Node.js)
-RUN pnpm install --no-frozen-lockfile
+EXPOSE 7860
 
-# بناء المشروع (تجاهل n8n-nodes-base)
-RUN pnpm run build --filter=!n8n-nodes-base
+ENV N8N_PORT=7860
+ENV N8N_HOST=0.0.0.0
+ENV N8N_LISTEN_ADDRESS=0.0.0.0
+ENV N8N_PROTOCOL=https
+ENV WEBHOOK_URL=https://new-eissa-my-n8n-automation1.hf.space
+ENV N8N_EDITOR_BASE_URL=https://new-eissa-my-n8n-automation1.hf.space
+ENV N8N_SECURE_COOKIE=false
+ENV N8N_DIAGNOSTICS_ENABLED=false
+ENV N8N_PERSONALIZATION_ENABLED=false
+ENV N8N_USER_FOLDER=/home/node/.n8n
+ENV DB_TYPE=sqlite
+ENV DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+ENV NODE_OPTIONS=--max-http-header-size=81920
+ENV N8N_ENCRYPTION_KEY=your-strong-encryption-key-here
 
-EXPOSE 5678
-CMD ["pnpm", "start"]
+CMD ["n8n"]
