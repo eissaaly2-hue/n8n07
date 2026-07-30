@@ -23,6 +23,6 @@ ENV N8N_USER_FOLDER=/home/node/.n8n
 ENV DB_TYPE=sqlite
 ENV DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
 ENV NODE_OPTIONS=--max-http-header-size=81920
-ENV N8N_ENCRYPTION_KEY=your-strong-encryption-key-here
+ENV N8N_ENCRYPTION_KEY=8fd43164c27e3030f46a3a391645e5b7df6f4d6ecb83a4b22adb9bd511cc6845
 
 CMD ["n8n"]
