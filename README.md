@@ -1,104 +1,23 @@
-![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
-
-# 🚀 n8n – The Platform for AI Agents and Workflow Automation
-
-**Live Deployment:** [https://n8n07.pxxl.run](https://n8n07.pxxl.run)
-
-![Deployment Status](https://img.shields.io/badge/deployment-live-brightgreen)
-![Node Version](https://img.shields.io/badge/node-22.22.0-blue)
-![pnpm Version](https://img.shields.io/badge/pnpm-10.22.0-orange)
-
+---
+title: My N8N Automation
+emoji: 🔧
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
 ---
 
-Fair-code platform to build and deploy AI agents and workflows. Combine a visual canvas with custom code, run it self-hosted or in the [cloud](https://app.n8n.cloud/login), and connect to 1500+ integrations. AI automation you can trust with real work, from prototype to production.
+# n8n on Hugging Face Spaces
 
-![n8n.io - Screenshot](https://raw.githubusercontent.com/n8n-io/n8n/master/assets/n8n-screenshot-readme.png)
+هذا الـ Space بيشغّل n8n (نسخة npm الرسمية) داخل حاوية Docker.
 
-## ✨ Key Capabilities
+## ملاحظات مهمة
 
-- **AI-Native Automation Platform**: Build and operationalize AI workflows and multi-step agents using your own data, models, and tools
-- **Model Flexibility, No Lock-In**: Connect to OpenAI, Anthropic, Google, or open-source models and switch providers without changing your architecture
-- **From Prototype to Production**: Design multi-step AI workflows with logic, tool use, human approvals, and full observability
-- **Code When You Need It**: Combine visual building with JavaScript, Python, and npm packages for advanced AI workflows
-- **Enterprise-Ready AI**: Self-host or deploy securely with role-based access, audit trails, and support for sensitive data
-- **Leverage What Already Exists**: 1500+ integrations and 9,000+ workflow [templates](https://n8n.io/workflows) to connect AI with your existing systems
+- **N8N_ENCRYPTION_KEY**: القيمة الموجودة في الـ Dockerfile دلوقتي قيمة حقيقية عشوائية (اتولدت مرة واحدة). **متغيرهاش بعد أول تشغيل** — لو غيرتها، هتفقد الوصول لأي بيانات اعتماد (credentials) اتخزنت قبل كده لأنها متشفرة بيها.
+- **DB_TYPE=sqlite**: البيانات بتتخزن في `/home/node/.n8n/database.sqlite` جوه الحاوية. لو الـ Space اتعمله rebuild من غير persistent storage، البيانات ممكن تضيع. لو محتاج ثبات البيانات، فعّل **Persistent Storage** من إعدادات الـ Space، أو استخدم قاعدة بيانات خارجية (Postgres/Supabase) بدل SQLite.
+- **WEBHOOK_URL / N8N_EDITOR_BASE_URL**: لازم يطابقوا الرابط الفعلي بتاع الـ Space (`https://<username>-<space-name>.hf.space`).
 
-## 🚀 Quick Start
+## لو حبيت تستخدم Postgres/Supabase بدل SQLite
 
-### Try n8n instantly with npx (requires Node.js):
-
-```bash
-npx n8n
-docker volume create n8n_data
-docker run -it --rm --name n8n -p 5678:5678 -v n8n_data:/home/node/.n8n docker.n8n.io/n8nio/n8n
-Access the editor:
-Open your browser and navigate to: http://localhost:5678
-
-Live Deployment:
-Access the live instance at: https://n8n07.pxxl.run
-
-📚 Resources
-📖 Documentation
-
-🔧 1500+ Integrations
-
-💡 Example Workflows
-
-🤖 AI & LangChain Guide
-
-👥 Community Forum
-
-📖 Community Tutorials
-
-🛠️ Technologies Used
-Node.js: v22.22.0
-
-pnpm: v10.22.0
-
-TypeScript: v6.0.2
-
-Turbo: v2.9.15
-
-Docker: For containerization
-
-Pxxl: Deployment platform
-
-📊 Build Status
-Component	Status
-Build	✅ Successful
-Deployment	✅ Live
-Node.js Version	✅ 22.22.0
-Dependencies	✅ Installed
-🤝 Support
-Need help? Our community forum is the place to get support and connect with other users:
-community.n8n.io
-
-📄 License
-n8n is fair-code distributed under the Sustainable Use License and n8n Enterprise License.
-
-Source Available: Always visible source code
-
-Self-Hostable: Deploy anywhere
-
-Extensible: Add your own nodes and functionality
-
-Enterprise Licenses available for additional features and support.
-
-Additional information about the license model can be found in the docs.
-
-🤝 Contributing
-Found a bug 🐛 or have a feature idea ✨? Check our Contributing Guide for a setup guide & best practices.
-
-💼 Join the Team
-Want to shape the future of automation? Check out our job posts and join our team!
-
-❓ What does n8n mean?
-Short answer: It means "nodemation" and is pronounced as n-eight-n.
-
-Long answer: "I get that question quite often (more often than I expected) so I decided it is probably best to answer it here. While looking for a good name for the project with a free domain I realized very quickly that all the good ones I could think of were already taken. So, in the end, I chose nodemation. 'node-' in the sense that it uses a Node-View and that it uses Node.js and '-mation' for 'automation' which is what the project is supposed to help with. However, I did not like how long the name was and I could not imagine writing something that long every time in the CLI. That is when I then ended up on 'n8n'." - Jan Oberhauser, Founder and CEO, n8n.io
-
-🎉 Deployment Status: LIVE
-Access the live instance: https://n8n07.pxxl.run
-
-Built with ❤️ using n8n, Node.js, and pnpm
-**كل التوفيق!** 🚀🎉
+استبدل السطرين دول:
