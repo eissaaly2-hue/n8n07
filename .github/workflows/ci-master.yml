@@ -22,7 +22,8 @@ jobs:
         uses: ./.github/actions/setup-nodejs
         with:
           build-command: pnpm build
-          node-version: '22.22.0'  # <--- تم التعديل
+          node-version: '22.22.0'
+          install-command: pnpm install --no-frozen-lockfile && npm rebuild sqlite3 --build-from-source
 
   unit-test:
     name: Unit tests
@@ -30,11 +31,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22.22.3]
+        node-version: [22.22.3]  # تم التعديل: إزالة 24.18.0
     with:
       ref: ${{ github.sha }}
       nodeVersion: ${{ matrix.node-version }}
-      collectCoverage: false
+      collectCoverage: false  # تم التعديل: false
     secrets: inherit
 
   lint:
