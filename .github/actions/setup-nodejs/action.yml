@@ -29,10 +29,7 @@ runs:
       shell: bash
 
     - name: Rebuild sqlite3
-      run: |
-        echo "Rebuilding sqlite3 for Node.js ${{ inputs.node-version }}"
-        cd node_modules/.pnpm/sqlite3@5.1.7/node_modules/sqlite3
-        npm run install
+      run: npm rebuild sqlite3 --build-from-source
       shell: bash
 
     - name: Build
