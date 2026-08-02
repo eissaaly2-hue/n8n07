@@ -2,7 +2,7 @@ name: Sync to Hugging Face Space
 
 on:
   push:
-    branches: [main]
+    branches: [master]  # تم التعديل: main -> master
   workflow_dispatch:
 
 jobs:
@@ -21,11 +21,11 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: '10.32.1'  # نفس الإصدار من package.json
+          version: '10.32.1'
 
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           git remote add hf https://new-eissa:$HF_TOKEN@huggingface.co/spaces/new-eissa/my-n8n-automation
-          git push hf main --force
+          git push hf master --force  # تم التعديل: main -> master
