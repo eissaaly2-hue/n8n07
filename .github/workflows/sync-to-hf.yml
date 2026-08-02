@@ -21,7 +21,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: '10.22.0'
+          version: '10.32.1'  # نفس الإصدار من package.json
 
       - name: Push to Hugging Face Space
         env:
