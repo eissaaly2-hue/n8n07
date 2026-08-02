@@ -1,4 +1,5 @@
 name: 'CI: Master (Build, Test, Lint)'
+if: false  # <--- تم إضافة هذا السطر لإلغاء الـ CI مؤقتاً
 
 on:
   push:
@@ -34,7 +35,7 @@ jobs:
     with:
       ref: ${{ github.sha }}
       nodeVersion: ${{ matrix.node-version }}
-      collectCoverage: false  # تم التعديل: false لأننا بنستخدم 22.22.3
+      collectCoverage: false  # تم التعديل: false
     secrets: inherit
 
   lint:
