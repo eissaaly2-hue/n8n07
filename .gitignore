@@ -89,3 +89,6 @@ lefthook-local.yml
 IMPROVEMENTS.md
 .playwright-mcp
 stryker.log
+
+# استبعاد ملفات الاختبار الكبيرة
+packages/@n8n/workflow-sdk/test-fixtures/real-workflows/*.zip
